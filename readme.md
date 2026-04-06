@@ -1,1 +1,1 @@
-dont ban this repo github 💔
+dont ban this repo github 💔 and fork it
